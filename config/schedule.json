@@ -1,0 +1,7 @@
+{
+  "workDays": [1, 2, 3, 4, 5],
+  "punchInReminder": "10:45",
+  "punchOutReminder": "19:45",
+  "additionalHolidays": [],
+  "staleWindowMinutes": 60
+}

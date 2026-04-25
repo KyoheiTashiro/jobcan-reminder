@@ -1,0 +1,20 @@
+{
+  "name": "jobcan-reminder",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "login": "node scripts/login.js",
+    "check:in": "node src/index.js --check-type punch_in",
+    "check:out": "node src/index.js --check-type punch_out",
+    "setup": "bash scripts/setup-launchd.sh"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "dotenv": "17.4.2",
+    "playwright": "1.59.1"
+  }
+}
