@@ -3,7 +3,7 @@ require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') }
 const logger = require('./logger');
 const { isWorkDay, loadSchedule } = require('./holidays');
 const { checkPunchStatus, hasSession } = require('./jobcan');
-const { sendLineMessage } = require('./line');
+const { sendSlackMessage } = require('./slack');
 
 function parseArgs() {
   const args = process.argv.slice(2);
@@ -56,7 +56,7 @@ async function main() {
   // Check session exists
   if (!hasSession()) {
     logger.error('No session file. Run: node scripts/login.js');
-    await sendLineMessage(
+    await sendSlackMessage(
       '⚠ ジョブカンのセッションファイルがありません。\nnode scripts/login.js を実行してログインしてください。'
     );
     return;
@@ -68,11 +68,11 @@ async function main() {
   if (result.error) {
     logger.error(result.error);
     if (result.status === 'session_expired') {
-      await sendLineMessage(
+      await sendSlackMessage(
         `⚠ ジョブカンのセッションが切れています。\nnode scripts/login.js を実行して再ログインしてください。`
       );
     } else {
-      await sendLineMessage(`⚠ ${result.error}`);
+      await sendSlackMessage(`⚠ ${result.error}`);
     }
     return;
   }
@@ -82,7 +82,7 @@ async function main() {
       checkType === 'punch_in'
         ? `🔔 ${label}打刻を忘れていませんか？\n始業まで15分です。ジョブカンで打刻してください。`
         : `🔔 ${label}打刻を忘れていませんか？\n終業まで15分です。ジョブカンで打刻してください。`;
-    await sendLineMessage(message);
+    await sendSlackMessage(message);
     logger.info(`Reminder sent: ${label} punch needed (status: ${result.status})`);
   } else {
     logger.info(`No reminder needed (status: ${result.status})`);
@@ -94,13 +94,13 @@ async function main() {
     await new Promise((resolve) => setTimeout(resolve, 60000));
     const retry = await checkPunchStatus(checkType);
     if (retry.error) {
-      await sendLineMessage(`⚠ ジョブカンチェック再試行も失敗しました: ${retry.error}`);
+      await sendSlackMessage(`⚠ ジョブカンチェック再試行も失敗しました: ${retry.error}`);
     } else if (retry.needsReminder) {
       const message =
         checkType === 'punch_in'
           ? `🔔 ${label}打刻を忘れていませんか？\n始業まで15分です。ジョブカンで打刻してください。`
           : `🔔 ${label}打刻を忘れていませんか？\n終業まで15分です。ジョブカンで打刻してください。`;
-      await sendLineMessage(message);
+      await sendSlackMessage(message);
     }
   }
 
