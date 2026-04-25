@@ -20,19 +20,26 @@ function parseArgs() {
   return checkType;
 }
 
+function buildReminderMessage(checkType, label) {
+  const phase = checkType === 'punch_in' ? '始業' : '終業';
+  return `🔔 ${label}打刻を忘れていませんか？\n${phase}まで15分です。ジョブカンで打刻してください。`;
+}
+
+function toMinutes(hhmm) {
+  const [h, m] = hhmm.split(':').map(Number);
+  return h * 60 + m;
+}
+
 function isWithinWindow(checkType) {
   const schedule = loadSchedule();
   const now = new Date();
-  const hours = now.getHours();
-  const minutes = now.getMinutes();
-  const nowMinutes = hours * 60 + minutes;
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
 
-  const timeStr = checkType === 'punch_in' ? schedule.punchInReminder : schedule.punchOutReminder;
-  const [h, m] = timeStr.split(':').map(Number);
-  const scheduledMinutes = h * 60 + m;
+  const window = checkType === 'punch_in' ? schedule.punchInWindow : schedule.punchOutWindow;
+  const start = toMinutes(window.start);
+  const end = toMinutes(window.end);
 
-  const diff = nowMinutes - scheduledMinutes;
-  return diff >= 0 && diff < schedule.staleWindowMinutes;
+  return nowMinutes >= start && nowMinutes < end;
 }
 
 async function main() {
@@ -62,8 +69,14 @@ async function main() {
     return;
   }
 
-  // Check punch status
-  const result = await checkPunchStatus(checkType);
+  let result = await checkPunchStatus(checkType);
+
+  // Retry once on transient error (60s wait). session_expired は再ログイン要のため対象外。
+  if (result.status === 'error') {
+    logger.info('Transient error. Retrying in 60 seconds...');
+    await new Promise((resolve) => setTimeout(resolve, 60000));
+    result = await checkPunchStatus(checkType);
+  }
 
   if (result.error) {
     logger.error(result.error);
@@ -78,30 +91,10 @@ async function main() {
   }
 
   if (result.needsReminder) {
-    const message =
-      checkType === 'punch_in'
-        ? `🔔 ${label}打刻を忘れていませんか？\n始業まで15分です。ジョブカンで打刻してください。`
-        : `🔔 ${label}打刻を忘れていませんか？\n終業まで15分です。ジョブカンで打刻してください。`;
-    await sendSlackMessage(message);
+    await sendSlackMessage(buildReminderMessage(checkType, label));
     logger.info(`Reminder sent: ${label} punch needed (status: ${result.status})`);
   } else {
     logger.info(`No reminder needed (status: ${result.status})`);
-  }
-
-  // Retry once on error
-  if (result.status === 'error') {
-    logger.info('Retrying in 60 seconds...');
-    await new Promise((resolve) => setTimeout(resolve, 60000));
-    const retry = await checkPunchStatus(checkType);
-    if (retry.error) {
-      await sendSlackMessage(`⚠ ジョブカンチェック再試行も失敗しました: ${retry.error}`);
-    } else if (retry.needsReminder) {
-      const message =
-        checkType === 'punch_in'
-          ? `🔔 ${label}打刻を忘れていませんか？\n始業まで15分です。ジョブカンで打刻してください。`
-          : `🔔 ${label}打刻を忘れていませんか？\n終業まで15分です。ジョブカンで打刻してください。`;
-      await sendSlackMessage(message);
-    }
   }
 
   logger.info(`--- ${label}打刻チェック完了 ---`);

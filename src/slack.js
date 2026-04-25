@@ -18,11 +18,9 @@ async function sendSlackMessage(text) {
     body: JSON.stringify({ channel, text }),
   });
 
-  const data = await response.json().catch(() => null);
-
-  if (!response.ok || !data || !data.ok) {
-    const errMsg = data && data.error ? data.error : `${response.status}`;
-    logger.error(`Slack API error: ${errMsg}`);
+  const data = await response.json();
+  if (!data.ok) {
+    logger.error(`Slack API error: ${data.error}`);
     return false;
   }
 
